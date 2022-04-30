@@ -36,16 +36,22 @@ public class Chrome {
         Assert.hasLength(q, "q must not be empty");
         driver.get("https://www.deepl.com/zh/translator#en/zh/" + q);
 
+        int oneCharCount = 0;
+
         for (int i = 0; i < 30; i++) {
             String result = getTranslateResult(driver.getPageSource());
-            if (result.length() > 1 && !result.contains("[...]")) {
+            if (result.length() ==1) {
+                oneCharCount++;
+            }
+
+            if ((result.length() > 1 && !result.contains("[...]")) || oneCharCount > 2) {
                 TranslateResult translateResult = new TranslateResult();
                 translateResult.setAlternatives(getAlternatives(driver.getPageSource()));
                 translateResult.setTarget(result);
                 translateResult.setSrc(q);
                 return translateResult;
             }
-            Thread.sleep(300);
+            Thread.sleep(200);
         }
         throw new RuntimeException("timeout");
     }
