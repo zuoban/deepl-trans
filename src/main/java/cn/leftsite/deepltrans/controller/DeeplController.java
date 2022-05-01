@@ -1,5 +1,7 @@
 package cn.leftsite.deepltrans.controller;
 
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.date.TimeInterval;
 import cn.leftsite.deepltrans.driver.Chrome;
 import cn.leftsite.deepltrans.entity.R;
 import cn.leftsite.deepltrans.entity.TranslateResult;
@@ -20,10 +22,9 @@ public class DeeplController {
     @GetMapping
     public R deepl(String q) {
         try {
-            long start = System.currentTimeMillis();
+            TimeInterval timer = DateUtil.timer();
             TranslateResult result = chrome.query(q);
-            long cost = System.currentTimeMillis() - start;
-            result.setCost(cost);
+            result.setCost(timer.interval());
             return R.ok(result);
         } catch (Exception e) {
             log.error("deepl error", e);

@@ -1,10 +1,13 @@
 package cn.leftsite.deepltrans.driver;
 
+import cn.hutool.core.lang.Validator;
 import cn.leftsite.deepltrans.entity.TranslateResult;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.springframework.stereotype.Component;
@@ -30,42 +33,42 @@ public class Chrome {
         chromeOptions.addArguments("--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1920,1200");
         this.driver = new ChromeDriver(chromeOptions);
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(3));
+        driver.get("https://www.deepl.com/zh/translator#en/zh/");
     }
 
     public TranslateResult query(String q) throws InterruptedException {
+        q = q.trim();
         Assert.hasLength(q, "q must not be empty");
-        driver.get("https://www.deepl.com/zh/translator#en/zh/" + q);
 
-        int oneCharCount = 0;
-
-        for (int i = 0; i < 30; i++) {
-            String result = getTranslateResult(driver.getPageSource());
-            if (result.length() ==1) {
-                oneCharCount++;
-            }
-
-            if ((result.length() > 1 && !result.contains("[...]")) || oneCharCount > 2) {
-                TranslateResult translateResult = new TranslateResult();
-                translateResult.setAlternatives(getAlternatives(driver.getPageSource()));
-                translateResult.setTarget(result);
-                translateResult.setSrc(q);
-                return translateResult;
+        WebElement textarea = driver.findElement(By.tagName("textarea"));
+        textarea.clear();
+        textarea.sendKeys(q);
+        Thread.sleep(1000);
+        for (int i = 0; i < 50; i++) {
+            TranslateResult result = getTranslateResult(driver.getPageSource());
+            if (Validator.hasChinese(result.getTarget())) {
+                Thread.sleep(200);
+                return getTranslateResult(driver.getPageSource());
             }
             Thread.sleep(200);
         }
-        throw new RuntimeException("timeout");
+        throw new RuntimeException("query timeout");
     }
 
-    private String getTranslateResult(String pageSource) {
+    private TranslateResult getTranslateResult(String pageSource) {
         Document doc = Jsoup.parse(pageSource);
-        return Objects.requireNonNull(doc.getElementById("target-dummydiv")).text();
-    }
+        TranslateResult result = new TranslateResult();
 
-    private List<String> getAlternatives(String pageSource) {
-        Document doc = Jsoup.parse(pageSource);
-        return doc.getElementsByClass("lmt__translations_as_text__text_btn").stream().map(Element::text).collect(Collectors.toList());
-    }
+        String target = Objects.requireNonNull(doc.getElementById("target-dummydiv")).text();
+        result.setTarget(target);
 
+        List<String> alternatives = doc.getElementsByClass("lmt__translations_as_text__text_btn").stream().map(Element::text).collect(Collectors.toList());
+        result.setAlternatives(alternatives);
+
+        String source = Objects.requireNonNull(doc.getElementById("source-dummydiv")).text();
+        result.setSrc(source);
+        return result;
+    }
 
     @PreDestroy
     public void destroy() {
